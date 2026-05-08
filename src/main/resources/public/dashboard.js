@@ -98,10 +98,11 @@
         if (u) {
             // Auto-scale when a unit is registered
             const a = Math.abs(v);
-            if (a >= 1e9) return (v / 1e9).toFixed(2) + 'G' + u;
-            if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M' + u;
-            if (a >= 1e4) return (v / 1e3).toFixed(1) + 'K' + u;
-            return (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2)) + u;
+            const isBytes = (u === 'Bytes');
+            if (a >= 1e9) return (v / 1e9).toFixed(2) + (isBytes ? ' GB' : 'G' + u);
+            if (a >= 1e6) return (v / 1e6).toFixed(2) + (isBytes ? ' MB' : 'M' + u);
+            if (a >= 1e4) return (v / 1e3).toFixed(1) + (isBytes ? ' KB' : 'K' + u);
+            return (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2)) + (isBytes ? ' B' : u);
         }
         // Raw number — no scaling
         if (Number.isInteger(v)) return v.toLocaleString();

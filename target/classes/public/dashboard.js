@@ -40,14 +40,14 @@
     const dashEl = $('dashboard'), backdropEl = $('backdrop');
 
     // ── Layout persistence ──
-    function loadLayout() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}; } catch { return {}; } }
-    function saveLayout(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify({...loadLayout(),...p})); }
+    function loadLayout() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } }
+    function saveLayout(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loadLayout(), ...p })); }
     function savePanelOrder() {
-        saveLayout({ panelOrder: [...dashEl.children].map(p=>p.dataset.panelId).filter(Boolean) });
+        saveLayout({ panelOrder: [...dashEl.children].map(p => p.dataset.panelId).filter(Boolean) });
     }
     function saveMerges() {
         const g = {};
-        panels.forEach((pd,pid) => { if (pd.seriesIds.length > 1) g[pid] = pd.seriesIds.slice(); });
+        panels.forEach((pd, pid) => { if (pd.seriesIds.length > 1) g[pid] = pd.seriesIds.slice(); });
         saveLayout({ mergedGroups: g });
     }
     (function restoreSettings() {
@@ -57,19 +57,21 @@
     })();
 
     // ── Search ──
-    function applyFilter(t) { dashEl.querySelectorAll('.panel').forEach(p => {
-        p.style.display = p.querySelector('.p-title').textContent.toLowerCase().includes(t) ? '' : 'none';
-    }); }
-    $('search-box').addEventListener('input', e => { const t=e.target.value.toLowerCase(); applyFilter(t); saveLayout({searchFilter:t}); });
+    function applyFilter(t) {
+        dashEl.querySelectorAll('.panel').forEach(p => {
+            p.style.display = p.querySelector('.p-title').textContent.toLowerCase().includes(t) ? '' : 'none';
+        });
+    }
+    $('search-box').addEventListener('input', e => { const t = e.target.value.toLowerCase(); applyFilter(t); saveLayout({ searchFilter: t }); });
 
     // ── Drag & Drop ──
     let draggedPanel = null;
-    window.dragStart = (_,p) => { draggedPanel = p; };
-    window.drop = (_,target) => {
+    window.dragStart = (_, p) => { draggedPanel = p; };
+    window.drop = (_, target) => {
         if (!draggedPanel || draggedPanel === target) return;
-        const all=[...dashEl.children], di=all.indexOf(draggedPanel), ti=all.indexOf(target);
+        const all = [...dashEl.children], di = all.indexOf(draggedPanel), ti = all.indexOf(target);
         di < ti ? target.after(draggedPanel) : target.before(draggedPanel);
-        panels.forEach(pd => { if(pd.chart) setTimeout(()=>pd.chart.resize(),50); });
+        panels.forEach(pd => { if (pd.chart) setTimeout(() => pd.chart.resize(), 50); });
         savePanelOrder();
     };
 
@@ -84,28 +86,29 @@
         localStorage.removeItem(STORAGE_KEY);
         location.reload();
     };
-    $('sel-window').onchange = e => { windowSec = +e.target.value; saveLayout({windowSec}); };
+    $('sel-window').onchange = e => { windowSec = +e.target.value; saveLayout({ windowSec }); };
 
     // ── Colors & Formatting ──
-    const palette = ['#73bf69','#3274d9','#f2cc0c','#e02f44','#8ab8ff','#ff780a','#e5a8e2','#32d1df'];
+    const palette = ['#73bf69', '#3274d9', '#f2cc0c', '#e02f44', '#8ab8ff', '#ff780a', '#e5a8e2', '#32d1df'];
     let ci = 0;
     function nextColor() { return palette[ci++ % palette.length]; }
     function fmt(v, mid) {
-        if (v==null||isNaN(v)) return '–';
+        if (v == null || isNaN(v)) return '–';
         const u = mid ? unitsConfig.get(mid) : null;
         if (u) {
             // Auto-scale when a unit is registered
-            const a=Math.abs(v);
-            if (a>=1e9) return (v/1e9).toFixed(2)+'G'+u;
-            if (a>=1e6) return (v/1e6).toFixed(2)+'M'+u;
-            if (a>=1e4) return (v/1e3).toFixed(1)+'K'+u;
-            return (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2)) + u;
+            const a = Math.abs(v);
+            const isBytes = (u === 'Bytes');
+            if (a >= 1e9) return (v / 1e9).toFixed(2) + (isBytes ? ' GB' : 'G' + u);
+            if (a >= 1e6) return (v / 1e6).toFixed(2) + (isBytes ? ' MB' : 'M' + u);
+            if (a >= 1e4) return (v / 1e3).toFixed(1) + (isBytes ? ' KB' : 'K' + u);
+            return (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2)) + (isBytes ? ' B' : u);
         }
         // Raw number — no scaling
         if (Number.isInteger(v)) return v.toLocaleString();
         return v.toFixed(4);
     }
-    function label(id) { return id.replace(/^(jvm|custom)_/,'').replace(/_/g,' '); }
+    function label(id) { return id.replace(/^(jvm|custom)_/, '').replace(/_/g, ' '); }
 
     // ── Stats bar ──
     setInterval(() => {
@@ -118,12 +121,14 @@
 
     // ── ECharts series builder ──
     function buildSeries(pd) {
-        return pd.seriesIds.map((id,i) => ({
-            name: label(id), type:'line', showSymbol:false,
+        return pd.seriesIds.map((id, i) => ({
+            name: label(id), type: 'line', showSymbol: false,
             lineStyle: { width: 1.5, color: pd.colors[id] },
-            areaStyle: i===0 ? { color: new echarts.graphic.LinearGradient(0,0,0,1,[
-                {offset:0,color:pd.colors[id]+'33'},{offset:1,color:pd.colors[id]+'00'}
-            ])} : null,
+            areaStyle: i === 0 ? {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    { offset: 0, color: pd.colors[id] + '33' }, { offset: 1, color: pd.colors[id] + '00' }
+                ])
+            } : null,
             data: []
         }));
     }
@@ -179,23 +184,23 @@
         <div class="p-legend" id="legend-${primaryId}"></div>`;
 
         // Merge button
-        panel.querySelector('[data-act="merge"]').onclick = function(e) {
+        panel.querySelector('[data-act="merge"]').onclick = function (e) {
             e.stopPropagation(); showMergeDropdown(primaryId, this);
         };
         // CSV
         panel.querySelector('[data-act="csv"]').onclick = () => {
             const pd = panels.get(primaryId); if (!pd) return;
-            const hdr = ['timestamp',...pd.seriesIds.map(label)].join(',');
+            const hdr = ['timestamp', ...pd.seriesIds.map(label)].join(',');
             const pBuf = buffers.get(pd.primaryId);
             if (!pBuf) return;
             const arr = pBuf.toArray();
-            const rows = arr.map((_,i) => {
+            const rows = arr.map((_, i) => {
                 const ts = arr[i][0];
-                return [ts,...pd.seriesIds.map(sid=>{const b=buffers.get(sid);if(!b)return '';const v=b.get(i);return v?v[1]:'';})].join(',');
+                return [ts, ...pd.seriesIds.map(sid => { const b = buffers.get(sid); if (!b) return ''; const v = b.get(i); return v ? v[1] : ''; })].join(',');
             });
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([hdr+'\n'+rows.join('\n')],{type:'text/csv'}));
-            a.download = title.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'.csv';
+            a.href = URL.createObjectURL(new Blob([hdr + '\n' + rows.join('\n')], { type: 'text/csv' }));
+            a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.csv';
             a.click();
         };
         // Maximize
@@ -206,7 +211,7 @@
         };
 
         // Insert at saved position
-        const order = (loadLayout().panelOrder||[]);
+        const order = (loadLayout().panelOrder || []);
         const si = order.indexOf(primaryId);
         let ins = false;
         if (si >= 0) {
@@ -220,35 +225,51 @@
         const cw = $(`cw-${primaryId}`);
         const chart = echarts.init(cw, null, { renderer: 'canvas' });
         chart.setOption({
-            animation: false, backgroundColor: 'transparent', textStyle:{color:'#9fa3a6'},
-            tooltip: { trigger:'axis', backgroundColor:'rgba(34,37,43,0.95)', borderColor:'#2c3235',
-                textStyle:{color:'#d8d9da',fontSize:12}, axisPointer:{type:'cross',label:{backgroundColor:'#22252b'}} },
+            animation: false, backgroundColor: 'transparent', textStyle: { color: '#9fa3a6' },
+            tooltip: {
+                trigger: 'axis', backgroundColor: 'rgba(34,37,43,0.95)', borderColor: '#2c3235',
+                textStyle: { color: '#d8d9da', fontSize: 12 }, axisPointer: { type: 'cross', label: { backgroundColor: '#22252b' } }
+            },
             toolbox: {
                 show: true, right: 8, top: 0, itemSize: 12,
                 feature: {
-                    dataZoom: { yAxisIndex:'none', title: { zoom:'Drag to zoom', back:'Undo zoom' },
-                        iconStyle: { borderColor:'#6c7378' }, emphasis: { iconStyle: { borderColor:'#33a2e5' } } },
-                    restore: { title:'Reset zoom', iconStyle: { borderColor:'#6c7378' },
-                        emphasis: { iconStyle: { borderColor:'#33a2e5' } } }
+                    dataZoom: {
+                        yAxisIndex: 'none', title: { zoom: 'Drag to zoom', back: 'Undo zoom' },
+                        iconStyle: { borderColor: '#6c7378' }, emphasis: { iconStyle: { borderColor: '#33a2e5' } }
+                    },
+                    restore: {
+                        title: 'Reset zoom', iconStyle: { borderColor: '#6c7378' },
+                        emphasis: { iconStyle: { borderColor: '#33a2e5' } }
+                    }
                 }
             },
-            grid: { top:8, bottom:30, left:10, right:16, containLabel:true },
+            grid: { top: 8, bottom: 30, left: 10, right: 16, containLabel: true },
             dataZoom: [
-                { type:'inside', xAxisIndex:0 },
-                { type:'slider', xAxisIndex:0, height:18, bottom:4, borderColor:'#2c3235',
-                  fillerColor:'rgba(50,116,217,0.15)', handleStyle:{color:'#3274d9'},
-                  textStyle:{color:'#9fa3a6',fontSize:10},
-                  dataBackground:{lineStyle:{color:'#2c3235'},areaStyle:{color:'#2c3235'}} }
+                { type: 'inside', xAxisIndex: 0 },
+                {
+                    type: 'slider', xAxisIndex: 0, height: 18, bottom: 4, borderColor: '#2c3235',
+                    fillerColor: 'rgba(50,116,217,0.15)', handleStyle: { color: '#3274d9' },
+                    textStyle: { color: '#9fa3a6', fontSize: 10 },
+                    dataBackground: { lineStyle: { color: '#2c3235' }, areaStyle: { color: '#2c3235' } }
+                }
             ],
-            xAxis: { type:'time', splitLine:{show:true,lineStyle:{color:'#2c3235',type:'dashed'}},
-                axisLine:{lineStyle:{color:'#3a3f47'}}, axisLabel:{color:'#8e8e8e',fontSize:10} },
-            yAxis: { type:'value', splitLine:{show:true,lineStyle:{color:'#2c3235',type:'dashed'}},
-                axisLine:{show:false}, axisLabel:{color:'#8e8e8e',fontSize:10,formatter:v=>fmt(v, primaryId)} },
-            series: [{ name:label(primaryId), type:'line', showSymbol:false,
-                lineStyle:{width:1.5,color:color},
-                areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
-                    {offset:0,color:color+'55'},{offset:1,color:color+'00'}])},
-                data:[] }]
+            xAxis: {
+                type: 'time', splitLine: { show: true, lineStyle: { color: '#2c3235', type: 'dashed' } },
+                axisLine: { lineStyle: { color: '#3a3f47' } }, axisLabel: { color: '#8e8e8e', fontSize: 10 }
+            },
+            yAxis: {
+                type: 'value', splitLine: { show: true, lineStyle: { color: '#2c3235', type: 'dashed' } },
+                axisLine: { show: false }, axisLabel: { color: '#8e8e8e', fontSize: 10, formatter: v => fmt(v, primaryId) }
+            },
+            series: [{
+                name: label(primaryId), type: 'line', showSymbol: false,
+                lineStyle: { width: 1.5, color: color },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: color + '55' }, { offset: 1, color: color + '00' }])
+                },
+                data: []
+            }]
         });
         chart.on('restore', () => {
             const pd = panels.get(primaryId);
@@ -337,7 +358,7 @@
     // ── Metric Init ──
     function ensureMetric(metricId) {
         if (!mstats.has(metricId)) {
-            mstats.set(metricId, { min:Infinity, max:-Infinity, sum:0, count:0, lastVal:null });
+            mstats.set(metricId, { min: Infinity, max: -Infinity, sum: 0, count: 0, lastVal: null });
             buffers.set(metricId, new RingBuffer(MAX));
             allMetricIds.push(metricId);
         }
@@ -481,16 +502,20 @@
                     markData.push({
                         yAxis: warn,
                         lineStyle: { color: '#f2cc0c', width: 1.5, type: 'dashed' },
-                        label: { formatter: `warn ${fmt(warn, pd.primaryId)}`, position: 'insideEndTop',
-                            color: '#f2cc0c', fontSize: 10 }
+                        label: {
+                            formatter: `warn ${fmt(warn, pd.primaryId)}`, position: 'insideEndTop',
+                            color: '#f2cc0c', fontSize: 10
+                        }
                     });
                 }
                 if (crit && !isNaN(crit)) {
                     markData.push({
                         yAxis: crit,
                         lineStyle: { color: '#e02f44', width: 1.5, type: 'dashed' },
-                        label: { formatter: `crit ${fmt(crit, pd.primaryId)}`, position: 'insideEndTop',
-                            color: '#e02f44', fontSize: 10 }
+                        label: {
+                            formatter: `crit ${fmt(crit, pd.primaryId)}`, position: 'insideEndTop',
+                            color: '#e02f44', fontSize: 10
+                        }
                     });
                 }
                 if (markData.length) {
@@ -505,8 +530,8 @@
     // ── WebSocket ──
     function connect() {
         const ws = new WebSocket(`ws://${location.host}/ws/telemetry`);
-        ws.onopen = () => { $('ws-dot').classList.add('on'); $('ws-label').textContent='Connected'; };
-        ws.onclose = () => { $('ws-dot').classList.remove('on'); $('ws-label').textContent='Reconnecting…'; setTimeout(connect,2000); };
+        ws.onopen = () => { $('ws-dot').classList.add('on'); $('ws-label').textContent = 'Connected'; };
+        ws.onclose = () => { $('ws-dot').classList.remove('on'); $('ws-label').textContent = 'Reconnecting…'; setTimeout(connect, 2000); };
         ws.onmessage = (e) => {
             msgThisSec++;
             if (paused) return;
@@ -534,9 +559,9 @@
                 }
             }
             if (data.thresholds) applyThresholds(data.thresholds);
-            for (const group of ['jvm','custom']) {
+            for (const group of ['jvm', 'custom']) {
                 if (!data[group]) continue;
-                for (const [key,val] of Object.entries(data[group])) {
+                for (const [key, val] of Object.entries(data[group])) {
                     if (typeof val === 'number') ingest(key, group, ts, val);
                 }
             }
