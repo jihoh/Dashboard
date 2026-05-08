@@ -24,7 +24,7 @@ public class JvmMetricsBinder {
         registry.registerCounter("jvm", HEAP_USED, () -> memoryBean.getHeapMemoryUsage().getUsed());
         registry.registerCounter("jvm", HEAP_MAX, () -> memoryBean.getHeapMemoryUsage().getMax());
         registry.registerCounter("jvm", THREADS, threadBean::getThreadCount);
-        
+
         if (osBean instanceof com.sun.management.OperatingSystemMXBean) {
             com.sun.management.OperatingSystemMXBean sunOsBean = (com.sun.management.OperatingSystemMXBean) osBean;
             registry.registerGauge("jvm", CPU, () -> sunOsBean.getProcessCpuLoad() * 100.0);
@@ -34,19 +34,24 @@ public class JvmMetricsBinder {
 
         for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
             String name = gcBean.getName().toLowerCase();
-            if (name.contains("young") || name.contains("scavenge") || name.contains("parnew") || name.contains("copy")) {
+            if (name.contains("young") || name.contains("scavenge") || name.contains("parnew")
+                    || name.contains("copy")) {
                 registry.registerCounter("jvm", YOUNG_GC, gcBean::getCollectionCount);
             } else if (name.contains("old") || name.contains("marksweep") || name.contains("concurrentmark")) {
                 registry.registerCounter("jvm", OLD_GC, gcBean::getCollectionCount);
             } else {
-                registry.registerCounter("jvm", name.replaceAll("[^a-zA-Z0-9]", "_") + "GcCount", gcBean::getCollectionCount);
+                registry.registerCounter("jvm", name.replaceAll("[^a-zA-Z0-9]", "_") + "GcCount",
+                        gcBean::getCollectionCount);
             }
         }
 
         // Default display config — applied once at bind time.
-        // Consumers can override these later via dashboard.chart(JvmMetricsBinder.HEAP_USED)...
+        // Consumers can override these later via
+        // dashboard.chart(JvmMetricsBinder.HEAP_USED)...
         registry.stats(HEAP_USED, Stat.MIN, Stat.MAX); // spikes and floors matter, not the avg
         registry.stats(HEAP_MAX, Stat.MIN, Stat.MAX);
+        registry.unit(HEAP_USED, "Bytes");
+        registry.unit(HEAP_MAX, "Bytes");
         registry.stats(THREADS, Stat.AVG); // steady-state baseline is the signal
         registry.stats(CPU, Stat.MAX, Stat.AVG); // spikes are important
         registry.unit(CPU, "%");

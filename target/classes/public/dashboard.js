@@ -92,19 +92,18 @@
     function nextColor() { return palette[ci++ % palette.length]; }
     function fmt(v, mid) {
         if (v==null||isNaN(v)) return '–';
-        let s;
-        const a=Math.abs(v);
-        if (a>=1e9) s = (v/1e9).toFixed(2)+'B';
-        else if (a>=1e6) s = (v/1e6).toFixed(2)+'M';
-        else if (a>=1e4) s = (v/1e3).toFixed(1)+'K';
-        else if (Number.isInteger(v)) s = v.toLocaleString();
-        else s = v.toFixed(2);
-        
-        if (mid) {
-            const u = unitsConfig.get(mid);
-            if (u) s += u;
+        const u = mid ? unitsConfig.get(mid) : null;
+        if (u) {
+            // Auto-scale when a unit is registered
+            const a=Math.abs(v);
+            if (a>=1e9) return (v/1e9).toFixed(2)+'G'+u;
+            if (a>=1e6) return (v/1e6).toFixed(2)+'M'+u;
+            if (a>=1e4) return (v/1e3).toFixed(1)+'K'+u;
+            return (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2)) + u;
         }
-        return s;
+        // Raw number — no scaling
+        if (Number.isInteger(v)) return v.toLocaleString();
+        return v.toFixed(4);
     }
     function label(id) { return id.replace(/^(jvm|custom)_/,'').replace(/_/g,' '); }
 
