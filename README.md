@@ -190,6 +190,27 @@ Your App                         TelemetryDashboard
 - **Transport**: WebSocket at `/ws/telemetry`
 - **History**: ring buffer (`snapshotHistory` seconds deep), replayed to new clients on connect
 
+### Hot-Path Safety
+
+This library is designed for low-latency systems. The **only thing your trading thread touches** is `LongAdder.increment()` (~5 ns). All collection, serialisation, and broadcasting runs on a separate daemon thread.
+
+```
+Trading Thread (hot path)          Publisher Thread (cold, 1 Hz)
+─────────────────────────          ─────────────────────────────
+ordersCreated.increment()  ←5ns   reads LongAdder.sum()
+                                   polls DoubleSupplier gauges
+                                   builds JSON (reused StringBuilder)
+                                   broadcasts to WebSocket clients
+```
+
+| Concern | Status |
+|---|---|
+| **Locks on hot path** | None. `LongAdder` uses cell-striping, no CAS on the fast path |
+| **Allocation on hot path** | Zero. `increment()` mutates a pre-allocated cell |
+| **Shared mutable state** | Only `LongAdder` cells — read by publisher via `sum()`, written by your thread via `increment()`. No contention |
+| **GC pressure** | ~1 String per poll tick (1/sec). `StringBuilder` is reused. Negligible |
+| **Thread affinity** | Publisher is a daemon thread — won't pin your cores |
+
 ---
 
 ## Running the Demo
