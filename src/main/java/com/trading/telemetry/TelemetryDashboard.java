@@ -34,7 +34,7 @@ public class TelemetryDashboard {
     private int port = 8080;
     private String title = "Disruptor Telemetry";
     private int pollIntervalSec = 1;
-    private int snapshotHistory = 28800;
+    private int snapshotHistory = 0; // Default to no history for zero memory overhead
     private TelemetryServer server;
 
     private TelemetryDashboard() {
@@ -99,11 +99,15 @@ public class TelemetryDashboard {
      * configuration.
      */
     public TelemetryDashboard start() {
-        server = new TelemetryServer(registry, port, pollIntervalSec, title, snapshotHistory);
-        int boundPort = server.start();
-        if (boundPort != -1) {
-            Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
-            System.out.println("📊 Telemetry Dashboard → http://localhost:" + boundPort);
+        try {
+            server = new TelemetryServer(registry, port, pollIntervalSec, title, snapshotHistory);
+            int boundPort = server.start();
+            if (boundPort != -1) {
+                Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+                System.out.println("📊 Telemetry Dashboard → http://localhost:" + boundPort);
+            }
+        } catch (Exception e) {
+            System.err.println("[TelemetryDashboard] Failed to start: " + e.getMessage() + ". Telemetry disabled.");
         }
         return this;
     }

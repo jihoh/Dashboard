@@ -11,7 +11,8 @@ import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 
 /**
- * WebSocket server that polls registered metrics and broadcasts JSON to connected clients.
+ * WebSocket server that polls registered metrics and broadcasts JSON to
+ * connected clients.
  */
 public class TelemetryServer {
     private final TelemetryRegistry registry;
@@ -26,10 +27,11 @@ public class TelemetryServer {
 
     // Snapshot ring buffer — replays history to new clients
     private final String[] snapshots;
-    private int snapHead = 0;
-    private int snapSize = 0;
+    private volatile int snapHead = 0;
+    private volatile int snapSize = 0;
 
-    public TelemetryServer(TelemetryRegistry registry, int port, int pollIntervalSec, String title, int snapshotCapacity) {
+    public TelemetryServer(TelemetryRegistry registry, int port, int pollIntervalSec, String title,
+            int snapshotCapacity) {
         this.registry = registry;
         this.port = port;
         this.pollIntervalSec = pollIntervalSec;
@@ -63,7 +65,7 @@ public class TelemetryServer {
                 currentPort++;
             }
         }
-        
+
         if (!started) {
             System.err.println("[TelemetryServer] Failed to bind after 10 attempts. Telemetry disabled.");
             running = false;
@@ -78,8 +80,13 @@ public class TelemetryServer {
 
     public void stop() {
         running = false;
-        if (publisherThread != null) publisherThread.interrupt();
-        app.stop();
+        if (publisherThread != null)
+            publisherThread.interrupt();
+        try {
+            app.stop();
+        } catch (Exception e) {
+            // Already stopped or never started
+        }
     }
 
     private void publishLoop() {
@@ -96,7 +103,8 @@ public class TelemetryServer {
                 // Always store snapshot for replay, even with no live clients
                 storeSnapshot(json);
 
-                if (clients.isEmpty()) continue;
+                if (clients.isEmpty())
+                    continue;
 
                 for (WsContext ctx : clients) {
                     try {
@@ -133,11 +141,13 @@ public class TelemetryServer {
 
     private void appendThresholds(StringBuilder sb) {
         var thresholds = registry.getThresholds();
-        if (thresholds.isEmpty()) return;
+        if (thresholds.isEmpty())
+            return;
         sb.append(",\"thresholds\":{");
         boolean first = true;
         for (var entry : thresholds.entrySet()) {
-            if (!first) sb.append(",");
+            if (!first)
+                sb.append(",");
             double[] wc = entry.getValue();
             sb.append("\"").append(entry.getKey()).append("\":[");
             appendDouble(sb, wc[0]);
@@ -151,11 +161,13 @@ public class TelemetryServer {
 
     private void appendUnits(StringBuilder sb) {
         var units = registry.getUnits();
-        if (units.isEmpty()) return;
+        if (units.isEmpty())
+            return;
         sb.append(",\"units\":{");
         boolean first = true;
         for (var entry : units.entrySet()) {
-            if (!first) sb.append(",");
+            if (!first)
+                sb.append(",");
             sb.append("\"").append(entry.getKey()).append("\":\"").append(entry.getValue()).append("\"");
             first = false;
         }
@@ -164,15 +176,18 @@ public class TelemetryServer {
 
     private void appendStatsConfig(StringBuilder sb) {
         var statsConfig = registry.getStatsConfig();
-        if (statsConfig.isEmpty()) return;
+        if (statsConfig.isEmpty())
+            return;
         sb.append(",\"statsConfig\":{");
         boolean first = true;
         for (var entry : statsConfig.entrySet()) {
-            if (!first) sb.append(",");
+            if (!first)
+                sb.append(",");
             sb.append("\"").append(entry.getKey()).append("\":[");
             boolean firstStat = true;
             for (Stat s : entry.getValue()) {
-                if (!firstStat) sb.append(",");
+                if (!firstStat)
+                    sb.append(",");
                 sb.append("\"").append(s.name().toLowerCase()).append("\"");
                 firstStat = false;
             }
@@ -190,8 +205,15 @@ public class TelemetryServer {
         for (int i = 0, n = counters.size(); i < n; i++) {
             final TelemetryRegistry.Metric<LongSupplier> m = counters.get(i);
             if (m.group.equals(group)) {
-                if (!first) sb.append(",");
-                sb.append("\"").append(m.name).append("\":").append(m.supplier.getAsLong());
+                long val;
+                try {
+                    val = m.supplier.getAsLong();
+                } catch (Exception e) {
+                    val = 0L;
+                }
+                if (!first)
+                    sb.append(",");
+                sb.append("\"").append(m.name).append("\":").append(val);
                 first = false;
             }
         }
@@ -200,9 +222,16 @@ public class TelemetryServer {
         for (int i = 0, n = gauges.size(); i < n; i++) {
             final TelemetryRegistry.Metric<DoubleSupplier> m = gauges.get(i);
             if (m.group.equals(group)) {
-                if (!first) sb.append(",");
-                double val = m.supplier.getAsDouble();
-                if (Double.isNaN(val) || Double.isInfinite(val)) val = 0.0;
+                double val;
+                try {
+                    val = m.supplier.getAsDouble();
+                } catch (Exception e) {
+                    val = 0.0;
+                }
+                if (Double.isNaN(val) || Double.isInfinite(val))
+                    val = 0.0;
+                if (!first)
+                    sb.append(",");
                 sb.append("\"").append(m.name).append("\":");
                 appendDouble(sb, val);
                 first = false;
@@ -214,26 +243,45 @@ public class TelemetryServer {
 
     /** Appends a double without allocating via Double.toString(). */
     private void appendDouble(StringBuilder sb, double val) {
-        if (Double.isNaN(val))      { sb.append("null"); return; }
-        if (Double.isInfinite(val)) { sb.append("null"); return; }
-        if (val == 0.0)             { sb.append('0'); return; }
+        if (Double.isNaN(val)) {
+            sb.append("null");
+            return;
+        }
+        if (Double.isInfinite(val)) {
+            sb.append("null");
+            return;
+        }
+        if (val == 0.0) {
+            sb.append('0');
+            return;
+        }
 
         long longVal = (long) val;
-        if (val == longVal) { sb.append(longVal); return; }
+        if (val == longVal) {
+            sb.append(longVal);
+            return;
+        }
 
-        if (val < 0) { sb.append('-'); val = -val; }
+        if (val < 0) {
+            sb.append('-');
+            val = -val;
+        }
 
         long intPart = (long) val;
         sb.append(intPart);
 
-        double frac    = val - intPart;
-        long   fracInt = Math.round(frac * 10_000);  // long: avoids int overflow at 4 dp
+        double frac = val - intPart;
+        long fracInt = Math.round(frac * 10_000); // long: avoids int overflow at 4 dp
         if (fracInt > 0) {
             int digits = 4;
-            while (digits > 0 && fracInt % 10 == 0) { fracInt /= 10; digits--; }
+            while (digits > 0 && fracInt % 10 == 0) {
+                fracInt /= 10;
+                digits--;
+            }
             if (digits > 0) {
                 sb.append('.');
-                for (int i = 0; i < digits; i++) dblBuf[i] = '0';
+                for (int i = 0; i < digits; i++)
+                    dblBuf[i] = '0';
                 for (int i = digits - 1; i >= 0 && fracInt > 0; i--) {
                     dblBuf[i] = (char) ('0' + (fracInt % 10));
                     fracInt /= 10;
@@ -245,6 +293,8 @@ public class TelemetryServer {
 
     private void storeSnapshot(String json) {
         int cap = snapshots.length;
+        if (cap == 0)
+            return;
         int idx = (snapHead + snapSize) % cap;
         snapshots[idx] = json;
         if (snapSize < cap) {
@@ -256,6 +306,8 @@ public class TelemetryServer {
 
     private void replaySnapshots(WsContext ctx) {
         int cap = snapshots.length;
+        if (cap == 0)
+            return;
         for (int i = 0; i < snapSize; i++) {
             try {
                 ctx.send(snapshots[(snapHead + i) % cap]);

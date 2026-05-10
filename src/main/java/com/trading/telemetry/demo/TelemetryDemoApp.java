@@ -33,6 +33,7 @@ public class TelemetryDemoApp {
         TelemetryDashboard dashboard = TelemetryDashboard.create()
                 .port(8088)
                 .title("Order Engine") // Optional custom name
+                .snapshotHistory(1800) // retain 30 mins for browser refreshes
                 .pollInterval(1) // seconds between metric snapshots
                 .jvmMetrics() // auto-bind heap, GC, threads
                 .start(); // → http://localhost:8080
